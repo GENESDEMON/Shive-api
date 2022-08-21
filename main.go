@@ -17,8 +17,10 @@ func main() {
 	router := gin.New()
 	router.Use(gin.Logger())
 
+	//Register our routes
 	routes.AuthRoutes(router)
 	routes.UserRoutes(*router)
+	routes.GenreRoutes(*router)
 
 	router.GET("/api-1", func(c *gin.Context) {
 		c.JSON(200, gin.H{

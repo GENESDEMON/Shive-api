@@ -19,7 +19,7 @@ func DBinstance() *mongo.Client {
 
 	//MongoDb := os.Getenv("MONGODB_URL")
 
-	client, err := mongo.NewClient(options.Client().ApplyURI("mongodb+srv://shiveAdmin:<password>@cluster0.ddsqfvw.mongodb.net/?retryWrites=true&w=majority"))
+	client, err := mongo.NewClient(options.Client().ApplyURI("mongodb+srv://shiveAdmin:Password2020#@cluster0.ddsqfvw.mongodb.net/?retryWrites=true&w=majority"))
 	if err != nil {
 		log.Fatal(err)
 	}

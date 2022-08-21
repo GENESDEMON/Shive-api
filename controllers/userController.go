@@ -10,6 +10,7 @@ import (
 
 	"github.com/genesdemon/golang-jwt-project/database"
 	helper "github.com/genesdemon/golang-jwt-project/helpers"
+
 	"github.com/genesdemon/golang-jwt-project/models"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
@@ -48,7 +49,7 @@ func Signup() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var ctx, cancel = context.WithTimeout(context.Background(), 100*time.Second)
 		var user models.User
-		defer cancel()
+
 		if err := c.BindJSON(&user); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -96,7 +97,11 @@ func Signup() gin.HandlerFunc {
 			return
 		}
 		defer cancel()
-		c.JSON(http.StatusOK, resultInsertionNumber)
+		c.JSON(http.StatusOK, gin.H{
+			"code":    http.StatusOK,
+			"MongoID": resultInsertionNumber,
+			"message": string("Account created successfully"), // cast it to string before showing
+		})
 	}
 
 }
@@ -141,6 +146,61 @@ func Login() gin.HandlerFunc {
 	}
 }
 
+func GetUser() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userId := c.Param("user_id")
+
+		if err := helper.MatchUserTypeToUid(c, userId); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		var ctx, cancel = context.WithTimeout(context.Background(), 100*time.Second)
+
+		var user models.User
+		err := userCollection.FindOne(ctx, bson.M{"user_id": userId}).Decode(&user)
+		defer cancel()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, user)
+	}
+}
+
+func EditUser() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		user_id := c.Query("id")
+		if user_id == "" {
+			c.Header("Content-Type", "application/json")
+			c.JSON(http.StatusNotFound, gin.H{"Error": "Invalid"})
+			c.Abort()
+			return
+		}
+		usert_id, err := primitive.ObjectIDFromHex(user_id)
+		if err != nil {
+			c.IndentedJSON(500, err)
+		}
+		var edituser models.User
+		if err := c.BindJSON(&edituser); err != nil {
+			c.IndentedJSON(http.StatusBadRequest, err.Error())
+		}
+		var ctx, cancel = context.WithTimeout(context.Background(), 100*time.Second)
+		defer cancel()
+		filter := bson.D{primitive.E{Key: "_id", Value: usert_id}}
+		update := bson.D{{Key: "$set",
+			Value: bson.D{primitive.E{Key: "user.name", Value: edituser.Name}}}}
+		_, err = userCollection.UpdateOne(ctx, filter, update)
+		if err != nil {
+			c.IndentedJSON(500, "Something Went Wrong")
+			return
+		}
+		defer cancel()
+		ctx.Done()
+		c.IndentedJSON(200, "Successfully Updated User's Details")
+	}
+}
+
+//For Admin to fetch all users
 func GetUsers() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if err := helper.CheckUserType(c, "ADMIN"); err != nil {
@@ -182,26 +242,5 @@ func GetUsers() gin.HandlerFunc {
 			log.Fatal(err)
 		}
 		c.JSON(http.StatusOK, allusers[0])
-	}
-}
-
-func GetUser() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		userId := c.Param("user_id")
-
-		if err := helper.MatchUserTypeToUid(c, userId); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-		var ctx, cancel = context.WithTimeout(context.Background(), 100*time.Second)
-
-		var user models.User
-		err := userCollection.FindOne(ctx, bson.M{"user_id": userId}).Decode(&user)
-		defer cancel()
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-		c.JSON(http.StatusOK, user)
 	}
 }
