@@ -11,7 +11,7 @@ func GenreRoutes(incomingRoutes gin.Engine) {
 	incomingRoutes.POST("/admin/creategenre", controllers.CreateGenre())
 	incomingRoutes.GET("/admin/:genre_id", controllers.GetGenre())
 	incomingRoutes.GET("/admin/getgenres", controllers.GetGenres())
-	incomingRoutes.PUT("/admin/editgenre", controllers.EditGenre())
+	incomingRoutes.PUT("/admin/editgenre/:genre_id", controllers.EditGenre())
 	//incomingRoutes.PUT("/admin/deletegenre", controllers.DeleteGenre())
 
 }

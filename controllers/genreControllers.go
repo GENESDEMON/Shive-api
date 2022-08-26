@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -11,6 +10,7 @@ import (
 	"github.com/genesdemon/golang-jwt-project/database"
 	helper "github.com/genesdemon/golang-jwt-project/helpers"
 	"github.com/genesdemon/golang-jwt-project/models"
+	"github.com/genesdemon/golang-jwt-project/responses"
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -19,51 +19,72 @@ import (
 
 var genreCollection *mongo.Collection = database.OpenCollection(database.Client, "genre")
 
-//To create a single genre
 func CreateGenre() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if err := helper.CheckUserType(c, "ADMIN"); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		var ctx, cancel = context.WithTimeout(context.Background(), 100*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		var genre models.Genre
+		defer cancel()
+
+		//validate the request body
 		if err := c.BindJSON(&genre); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			c.JSON(http.StatusBadRequest, responses.GenreResponse{
+				Status:  http.StatusBadRequest,
+				Message: "error",
+				Data:    map[string]interface{}{"data": err.Error()}})
 			return
 		}
-		validationErr := validate.Struct(genre)
-		if validationErr != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": validationErr.Error()})
-			return
-		}
+
+		//Check to see if name exists
 		count, err := genreCollection.CountDocuments(ctx, bson.M{"name": genre.Name})
 		defer cancel()
 		if err != nil {
 			log.Panic(err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "error occured while checking for the Name"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "error occured while checking for the Name"})
 		}
 		if count > 0 {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "this genre name already exists"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "this genre name already exists"})
 		}
 
-		genre.Created_at, _ = time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
-		genre.Updated_at, _ = time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
-		genre.Genre_ID = primitive.NewObjectID()
-		genre.Genre_id = genre.Genre_ID.Hex()
-
-		resultInsertionNumber, insertErr := genreCollection.InsertOne(ctx, genre)
-		if insertErr != nil {
-			msg := fmt.Sprintf("Genre was not created")
-			c.JSON(http.StatusInternalServerError, gin.H{"error": msg})
+		//use the validator library to validate required fields
+		if validationErr := validate.Struct(&genre); validationErr != nil {
+			c.JSON(http.StatusBadRequest, responses.GenreResponse{
+				Status:  http.StatusBadRequest,
+				Message: "error",
+				Data:    map[string]interface{}{"data": validationErr.Error()}})
 			return
 		}
-		defer cancel()
-		c.JSON(http.StatusOK, gin.H{
-			"code":    http.StatusOK,
-			"MongoID": resultInsertionNumber,
-			"message": string("Request complete"), // cast it to string before showing
-		})
+
+		newGenre := models.Genre{
+			Id:   primitive.NewObjectID(),
+			Name: genre.Name,
+		}
+
+		result, err := genreCollection.InsertOne(ctx, newGenre)
+
+		if err != nil {
+			c.JSON(http.StatusBadRequest, responses.GenreResponse{
+				Status:  http.StatusBadRequest,
+				Message: "error",
+				Data:    map[string]interface{}{"data": err.Error()}})
+			return
+		}
+
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, responses.GenreResponse{
+				Status:  http.StatusInternalServerError,
+				Message: "error",
+				Data:    map[string]interface{}{"data": err.Error()}})
+			return
+		}
+
+		c.JSON(http.StatusCreated, responses.GenreResponse{
+			Status:  http.StatusCreated,
+			Message: "success",
+			Data:    map[string]interface{}{"data": result}})
 	}
 }
 
@@ -123,37 +144,58 @@ func GetGenres() gin.HandlerFunc {
 	}
 }
 
-//To edit just one genre
+//Edit genre
 func EditGenre() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		user_id := c.Query("id")
-		if user_id == "" {
-			c.Header("Content-Type", "application/json")
-			c.JSON(http.StatusNotFound, gin.H{"Error": "Invalid"})
-			c.Abort()
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		genreId := c.Param("genre_id")
+		var genre models.Genre
+		defer cancel()
+		objId, _ := primitive.ObjectIDFromHex(genreId)
+
+		//validate the request body
+		if err := c.BindJSON(&genre); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"Status":  http.StatusBadRequest,
+				"Message": "error",
+				"Data":    map[string]interface{}{"data": err.Error()}})
 			return
 		}
-		usert_id, err := primitive.ObjectIDFromHex(user_id)
-		if err != nil {
-			c.IndentedJSON(500, err)
-		}
-		var editgenre models.Genre
-		if err := c.BindJSON(&editgenre); err != nil {
-			c.IndentedJSON(http.StatusBadRequest, err.Error())
-		}
-		var ctx, cancel = context.WithTimeout(context.Background(), 100*time.Second)
-		defer cancel()
-		filter := bson.D{primitive.E{Key: "_id", Value: usert_id}}
-		update := bson.D{{Key: "$set", Value: bson.D{primitive.E{Key: "genre.name", Value: editgenre.Name}}}}
-		_, err = genreCollection.UpdateOne(ctx, filter, update)
-		if err != nil {
-			c.IndentedJSON(500, "Something Went Wrong")
+
+		//use the validator library to validate required fields
+		if validationErr := validate.Struct(&genre); validationErr != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"Status":  http.StatusBadRequest,
+				"Message": "error",
+				"Data":    map[string]interface{}{"data": validationErr.Error()}})
 			return
 		}
-		defer cancel()
-		ctx.Done()
-		c.IndentedJSON(200, "Successfully Updated the Genre")
+
+		update := bson.M{"name": genre.Name}
+		result, err := genreCollection.UpdateOne(ctx, bson.M{"id": objId}, bson.M{"$set": update})
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"Status":  http.StatusInternalServerError,
+				"Message": "error",
+				"Data":    map[string]interface{}{"data": err.Error()}})
+			return
+		}
+		//get updated genre details
+		var updatedGenre models.Genre
+		if result.MatchedCount == 1 {
+			err := genreCollection.FindOne(ctx, bson.M{"id": objId}).Decode(&updatedGenre)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"Status":  http.StatusInternalServerError,
+					"Message": "error",
+					"Data":    map[string]interface{}{"data": err.Error()}})
+				return
+			}
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"Status":  http.StatusOK,
+			"Message": "success",
+			"Data":    map[string]interface{}{"data": updatedGenre}})
 	}
 }
-
-//Delete genre
