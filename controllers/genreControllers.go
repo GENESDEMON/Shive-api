@@ -39,14 +39,16 @@ func CreateGenre() gin.HandlerFunc {
 		}
 
 		//Check to see if name exists
-		count, err := genreCollection.CountDocuments(ctx, bson.M{"name": genre.Name})
+		regexMatch := bson.M{"$regex": primitive.Regex{Pattern: *genre.Name, Options: "i"}}
+		count, err := genreCollection.CountDocuments(ctx, bson.M{"name": regexMatch})
 		defer cancel()
 		if err != nil {
 			log.Panic(err)
 			c.JSON(http.StatusBadRequest, gin.H{"error": "error occured while checking for the Name"})
 		}
 		if count > 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "this genre name already exists"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "this genre name already exists", "count": count})
+			return
 		}
 
 		//use the validator library to validate required fields
@@ -88,7 +90,7 @@ func CreateGenre() gin.HandlerFunc {
 	}
 }
 
-//To get just one genre
+// To get just one genre
 func GetGenre() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		genreId := c.Param("genre_id")
@@ -104,7 +106,7 @@ func GetGenre() gin.HandlerFunc {
 	}
 }
 
-//To fetch all genres
+// To fetch all genres
 func GetGenres() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var ctx, cancel = context.WithTimeout(context.Background(), 100*time.Second)
@@ -144,7 +146,7 @@ func GetGenres() gin.HandlerFunc {
 	}
 }
 
-//Edit genre
+// Edit genre
 func EditGenre() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -172,7 +174,8 @@ func EditGenre() gin.HandlerFunc {
 		}
 
 		update := bson.M{"name": genre.Name}
-		result, err := genreCollection.UpdateOne(ctx, bson.M{"id": objId}, bson.M{"$set": update})
+		filterByID := bson.M{"_id": bson.M{"$eq": objId}}
+		result, err := genreCollection.UpdateOne(ctx, filterByID, bson.M{"$set": update})
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"Status":  http.StatusInternalServerError,
@@ -183,7 +186,7 @@ func EditGenre() gin.HandlerFunc {
 		//get updated genre details
 		var updatedGenre models.Genre
 		if result.MatchedCount == 1 {
-			err := genreCollection.FindOne(ctx, bson.M{"id": objId}).Decode(&updatedGenre)
+			err := genreCollection.FindOne(ctx, filterByID).Decode(&updatedGenre)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{
 					"Status":  http.StatusInternalServerError,
@@ -196,6 +199,7 @@ func EditGenre() gin.HandlerFunc {
 		c.JSON(http.StatusOK, gin.H{
 			"Status":  http.StatusOK,
 			"Message": "success",
-			"Data":    map[string]interface{}{"data": updatedGenre}})
+			"Data":    updatedGenre})
+		// "Data":    map[string]interface{}{"data": updatedGenre}})
 	}
 }
