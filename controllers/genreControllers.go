@@ -92,16 +92,26 @@ func CreateGenre() gin.HandlerFunc {
 // To get just one genre
 func GetGenre() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		genreId := c.Param("genre_id")
-		var ctx, cancel = context.WithTimeout(context.Background(), 100*time.Second)
 		var genre models.Genre
-		err := genreCollection.FindOne(ctx, bson.M{"genre_id": genreId}).Decode(&genre)
 		defer cancel()
+
+		objId, _ := primitive.ObjectIDFromHex(genreId)
+
+		err := genreCollection.FindOne(ctx, bson.M{"_id": objId}).Decode(&genre)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"Status":  http.StatusInternalServerError,
+				"Message": "error",
+				"Data":    map[string]interface{}{"data": err.Error()}})
 			return
 		}
-		c.JSON(http.StatusOK, genre)
+
+		c.JSON(http.StatusOK, gin.H{
+			"Status":  http.StatusOK,
+			"Message": "success",
+			"Data":    map[string]interface{}{"data": genre}})
 	}
 }
 
