@@ -8,10 +8,10 @@ import (
 
 func GenreRoutes(incomingRoutes gin.Engine) {
 	incomingRoutes.Use(middleware.Authenticate())
-	incomingRoutes.POST("/admin/creategenre", controllers.CreateGenre())
-	incomingRoutes.GET("/admin/:genre_id", controllers.GetGenre())
-	incomingRoutes.GET("/admin/getgenres", controllers.GetGenres())
-	incomingRoutes.PUT("/admin/editgenre/:genre_id", controllers.EditGenre())
-	//incomingRoutes.PUT("/admin/deletegenre", controllers.DeleteGenre())
+	incomingRoutes.POST("/genres/creategenre", controllers.CreateGenre())
+	incomingRoutes.GET("/genres/:genre_id", controllers.GetGenre())
+	incomingRoutes.GET("/genres/getgenres", controllers.GetGenres())
+	incomingRoutes.PUT("/genres/editgenre/:genre_id", controllers.EditGenre())
+	incomingRoutes.DELETE("/genres/:genre_id", controllers.DeleteAGenre())
 
 }
