@@ -13,5 +13,5 @@ func MovieRoutes(incomingRoutes gin.Engine) {
 	incomingRoutes.GET("/movies/getmovies", controllers.GetMovies())
 	incomingRoutes.PUT("/movies/editmovie/:movie_id", controllers.EditMovie())
 	incomingRoutes.DELETE("/movies/:movie_id", controllers.DeleteMovie())
-
+	incomingRoutes.GET("/movies/search", controllers.SearchMovieByQuery())
 }

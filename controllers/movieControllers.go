@@ -250,3 +250,38 @@ func DeleteMovie() gin.HandlerFunc {
 		)
 	}
 }
+
+func SearchMovieByQuery() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var searchmovies []models.Movie
+		queryParam := c.Query("name")
+		if queryParam == "" {
+			log.Println("query is empty")
+			c.Header("Content-Type", "application/json")
+			c.JSON(http.StatusNotFound, gin.H{"Error": "Invalid Search Index"})
+			c.Abort()
+			return
+		}
+		var ctx, cancel = context.WithTimeout(context.Background(), 100*time.Second)
+		defer cancel()
+		searchquerydb, err := movieCollection.Find(ctx, bson.M{"name": bson.M{"$regex": queryParam}})
+		if err != nil {
+			c.IndentedJSON(404, "something went wrong in fetching the dbquery")
+			return
+		}
+		err = searchquerydb.All(ctx, &searchmovies)
+		if err != nil {
+			log.Println(err)
+			c.IndentedJSON(400, "invalid")
+			return
+		}
+		defer searchquerydb.Close(ctx)
+		if err := searchquerydb.Err(); err != nil {
+			log.Println(err)
+			c.IndentedJSON(400, "invalid request")
+			return
+		}
+		defer cancel()
+		c.IndentedJSON(200, searchmovies)
+	}
+}
