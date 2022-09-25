@@ -60,12 +60,11 @@ func CreateMovie() gin.HandlerFunc {
 		}
 
 		newMovie := models.Movie{
-			Id:         primitive.NewObjectID(),
-			Name:       movie.Name,
-			Topic:      movie.Topic,
-			Genre_id:   movie.Genre_id,
-			Genre_name: movie.Genre_name,
-			Movie_URL:  movie.Movie_URL,
+			Id:        primitive.NewObjectID(),
+			Name:      movie.Name,
+			Topic:     movie.Topic,
+			Genre_id:  movie.Genre_id,
+			Movie_URL: movie.Movie_URL,
 		}
 
 		result, err := movieCollection.InsertOne(ctx, newMovie)
@@ -186,7 +185,11 @@ func EditMovie() gin.HandlerFunc {
 			return
 		}
 
-		update := bson.M{"name": movie.Name, "topic": movie.Topic, "genre_id": movie.Genre_id, "genre_name": movie.Genre_name, "movie_url": movie.Movie_URL}
+		update := bson.M{
+			"name":      movie.Name,
+			"topic":     movie.Topic,
+			"genre_id":  movie.Genre_id,
+			"movie_url": movie.Movie_URL}
 		filterByID := bson.M{"_id": bson.M{"$eq": objId}}
 		result, err := movieCollection.UpdateOne(ctx, filterByID, bson.M{"$set": update})
 		if err != nil {
@@ -283,5 +286,40 @@ func SearchMovieByQuery() gin.HandlerFunc {
 		}
 		defer cancel()
 		c.IndentedJSON(200, searchmovies)
+	}
+}
+
+func SearchMovieByGenre() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var searchbygenre []models.Movie
+		queryParam := c.Query("genre_id")
+		if queryParam == "" {
+			log.Println("query is empty")
+			c.Header("Content-Type", "application/json")
+			c.JSON(http.StatusNotFound, gin.H{"Error": "Invalid Search Index"})
+			c.Abort()
+			return
+		}
+		var ctx, cancel = context.WithTimeout(context.Background(), 100*time.Second)
+		defer cancel()
+		searchdb, err := movieCollection.Find(ctx, bson.M{"genre_id": bson.M{"$regex": queryParam}})
+		if err != nil {
+			c.IndentedJSON(404, "something went wrong in fetching the dbquery")
+			return
+		}
+		err = searchdb.All(ctx, &searchbygenre)
+		if err != nil {
+			log.Println(err)
+			c.IndentedJSON(400, "invalid")
+			return
+		}
+		defer searchdb.Close(ctx)
+		if err := searchdb.Err(); err != nil {
+			log.Println(err)
+			c.IndentedJSON(400, "invalid request")
+			return
+		}
+		defer cancel()
+		c.IndentedJSON(200, searchbygenre)
 	}
 }

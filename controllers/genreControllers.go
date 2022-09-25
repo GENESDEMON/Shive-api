@@ -158,6 +158,10 @@ func GetGenres() gin.HandlerFunc {
 // Edit genre
 func EditGenre() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if err := helper.CheckUserType(c, "ADMIN"); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		genreId := c.Param("genre_id")
 		var genre models.Genre
