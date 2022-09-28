@@ -22,6 +22,7 @@ func main() {
 	routes.UserRoutes(*router)
 	routes.GenreRoutes(*router)
 	routes.MovieRoutes(*router)
+	routes.ReviewRoutes(*router)
 
 	router.GET("/api-1", func(c *gin.Context) {
 		c.JSON(200, gin.H{
