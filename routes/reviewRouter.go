@@ -10,6 +10,6 @@ func ReviewRoutes(incomingRoutes gin.Engine) {
 	incomingRoutes.Use(middleware.Authenticate())
 	incomingRoutes.POST("reviews/addreview", controllers.AddAReview())
 	incomingRoutes.DELETE("/reviews/:_id", controllers.DeleteAReview())
-	incomingRoutes.GET("/movies/:movie_id", controllers.ViewAMovieReviews())
-	incomingRoutes.GET("/movies/:reviewer_id", controllers.AllUserReviews())
+	incomingRoutes.GET("/reviews/review_id", controllers.ViewAMovieReviews())
+	incomingRoutes.GET("/reviews/:reviewer_id", controllers.AllUserReviews())
 }

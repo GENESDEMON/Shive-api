@@ -45,40 +45,40 @@ func VerifyPassword(userPassword string, providedPassword string) (bool, string)
 func Signup() gin.HandlerFunc {
 
 	return func(c *gin.Context) {
-		var ctx, cancel = context.WithTimeout(context.Background(), 100*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		var user models.User
+		defer cancel()
 
+		//validate the request body
 		if err := c.BindJSON(&user); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			c.JSON(http.StatusBadRequest, gin.H{
+				"Status":  http.StatusBadRequest,
+				"Message": "error",
+				"Data":    map[string]interface{}{"data": err.Error()}})
 			return
 		}
 
-		validationErr := validate.Struct(user)
-		if validationErr != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": validationErr.Error()})
-			return
-		}
-
-		count, err := userCollection.CountDocuments(ctx, bson.M{"email": user.Email})
+		//Check to see if name exists
+		regexMatch := bson.M{"$regex": primitive.Regex{Pattern: *user.Email, Options: "i"}}
+		count, err := userCollection.CountDocuments(ctx, bson.M{"email": regexMatch})
+		usernameMatch := bson.M{"$regex": primitive.Regex{Pattern: *user.Username, Options: "i"}}
+		ucount, err := userCollection.CountDocuments(ctx, bson.M{"username": usernameMatch})
 		defer cancel()
 		if err != nil {
 			log.Panic(err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "error occured while checking for the email"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "error occured while checking for the Name"})
+		}
+		if count > 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "this email already exists", "count": count})
+			return
+		}
+		if ucount > 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "this username already exists", "count": count})
+			return
 		}
 
 		password := HashPassword(*user.Password)
 		user.Password = &password
-
-		count, err = userCollection.CountDocuments(ctx, bson.M{"username": user.Username})
-		defer cancel()
-		if err != nil {
-			log.Panic(err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "error occured while checking for the username"})
-		}
-
-		if count > 0 {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "this email or username already exists"})
-		}
 
 		user.Created_at, _ = time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
 		user.Updated_at, _ = time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
@@ -88,18 +88,58 @@ func Signup() gin.HandlerFunc {
 		user.Token = &token
 		user.Refresh_token = &refreshToken
 
-		resultInsertionNumber, insertErr := userCollection.InsertOne(ctx, user)
-		if insertErr != nil {
-			msg := fmt.Sprintf("User item was not created")
-			c.JSON(http.StatusInternalServerError, gin.H{"error": msg})
+		//use the validator library to validate required fields
+		if validationErr := validate.Struct(&user); validationErr != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"Status":  http.StatusBadRequest,
+				"Message": "error",
+				"Data":    map[string]interface{}{"data": validationErr.Error()}})
 			return
 		}
-		defer cancel()
-		c.JSON(http.StatusOK, gin.H{
-			"code":    http.StatusOK,
-			"MongoID": resultInsertionNumber,
-			"message": string("Account created successfully"), // cast it to string before showing
-		})
+
+		//use the validator library to validate required fields
+		if validationErr := validate.Struct(&user); validationErr != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"Status":  http.StatusBadRequest,
+				"Message": "error",
+				"Data":    map[string]interface{}{"data": validationErr.Error()}})
+			return
+		}
+
+		newUser := models.User{
+			ID:            primitive.NewObjectID(),
+			Name:          user.Name,
+			Username:      user.Username,
+			Email:         user.Email,
+			Password:      user.Password,
+			Created_at:    user.Created_at,
+			Updated_at:    user.Updated_at,
+			Token:         user.Token,
+			Refresh_token: user.Refresh_token,
+		}
+
+		result, err := userCollection.InsertOne(ctx, newUser)
+
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"Status":  http.StatusBadRequest,
+				"Message": "error",
+				"Data":    map[string]interface{}{"data": err.Error()}})
+			return
+		}
+
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"Status":  http.StatusInternalServerError,
+				"Message": "error",
+				"Data":    map[string]interface{}{"data": err.Error()}})
+			return
+		}
+
+		c.JSON(http.StatusCreated, gin.H{
+			"Status":  http.StatusCreated,
+			"Message": "success",
+			"Data":    map[string]interface{}{"data": result}})
 	}
 
 }

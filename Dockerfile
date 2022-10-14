@@ -1,6 +1,5 @@
-FROM golang:1.18-alpine
-
-RUN apk add --no-cache git
+FROM  golang:1.18
+#RUN apk add --no-cache git
 
 # Set the Current Working Directory inside the container
 WORKDIR /golang-jwt-project
@@ -21,6 +20,4 @@ RUN go build -o ./out/golang-jwt-project .
 EXPOSE 8000
 
 # Run the binary program produced by `go install`
-CMD ["./out/golang-jwt-project"]
-
-
+#CMD ["./out/golang-jwt-project"]
