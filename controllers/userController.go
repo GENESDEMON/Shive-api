@@ -79,7 +79,6 @@ func Signup() gin.HandlerFunc {
 
 		password := HashPassword(*user.Password)
 		user.Password = &password
-
 		user.Created_at, _ = time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
 		user.Updated_at, _ = time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
 		user.ID = primitive.NewObjectID()
@@ -107,14 +106,16 @@ func Signup() gin.HandlerFunc {
 		}
 
 		newUser := models.User{
-			ID:            primitive.NewObjectID(),
+			ID:            user.ID,
 			Name:          user.Name,
 			Username:      user.Username,
 			Email:         user.Email,
+			User_id:       user.ID.Hex(),
 			Password:      user.Password,
 			Created_at:    user.Created_at,
 			Updated_at:    user.Updated_at,
 			Token:         user.Token,
+			User_type:     user.User_type,
 			Refresh_token: user.Refresh_token,
 		}
 
